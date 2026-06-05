@@ -40,31 +40,23 @@ def reverse_translate_protein(protein, codon_freqs):
 
 if __name__ == "__main__":
 
-    from optparse import OptionParser
+    import argparse
     import DNA_tools as dt
     import sys
 
-    parser = OptionParser()
-    parser.add_option('--input',
-          '-i',
-          action = 'store',
-          type = 'string',
+    parser = argparse.ArgumentParser(
+        description = "Reverse translate a protein fasta into a DNA fasta using loaded codon frequencies")
+    parser.add_argument('--input', '-i',
           dest = 'input_fasta',
           help = "input fasta with your protein sequence(s) to be reverse translated")
-    parser.add_option('--output',
-          '-o',
-          action = 'store',
-          type = 'string',
+    parser.add_argument('--output', '-o',
           dest = 'output_fasta',
           help = "output fasta with your reverse translated DNA sequence(s)")
-    parser.add_option('--bias',
-          '-b',
-          action = 'store',
-          type = 'string',
+    parser.add_argument('--bias', '-b',
           dest = 'bias_file',
-          help = "codon bias file",
-          default = "../codon_sets/ColiProteomeContent.tsv")
+          default = "../codon_sets/ColiProteomeContent.tsv",
+          help = "codon bias file")
 
-    (option, args) = parser.parse_args()
+    option = parser.parse_args()
 
     main(option.input_fasta, option.output_fasta, option.bias_file)

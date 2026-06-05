@@ -25,30 +25,22 @@ def main(input_fasta, output_table, delimiter):
 
 if __name__ == "__main__":
 
-    from optparse import OptionParser
+    import argparse
     import DNA_tools as dt
 
-    parser = OptionParser()
-    parser.add_option('--input',
-          '-i',
-          action = 'store',
-          type = 'string',
+    parser = argparse.ArgumentParser(
+        description = "Convert a fasta file into a table (.csv by default)")
+    parser.add_argument('--input', '-i',
           dest = 'input_fasta',
           help = "input fasta file")
-    parser.add_option('--output',
-          '-o',
-          action = 'store',
-          type = 'string',
+    parser.add_argument('--output', '-o',
           dest = 'output_table',
           help = "output table file (.csv)")
-    parser.add_option('--delimiter',
-          '-d',
-          action = 'store',
-          type = 'string',
+    parser.add_argument('--delimiter', '-d',
           dest = 'delimiter',
-          help = "column delimiter; accepts escapes like '\\t' and the aliases 'tab'/'comma' (default: ',')",
-          default = ",")
+          default = ",",
+          help = "column delimiter; accepts escapes like '\\t' and the aliases 'tab'/'comma' (default: ',')")
 
-    (option, args) = parser.parse_args()
+    option = parser.parse_args()
 
     main(option.input_fasta, option.output_table, option.delimiter)

@@ -46,49 +46,37 @@ def main(input_table, output_fasta, delimiter, name_col, seq_col, header):
 
 if __name__ == "__main__":
 
-    from optparse import OptionParser
+    import argparse
 
-    parser = OptionParser()
-    parser.add_option('--input',
-          '-i',
-          action = 'store',
-          type = 'string',
+    parser = argparse.ArgumentParser(
+        description = "Convert a table of DNA or protein sequences into a fasta file")
+    parser.add_argument('--input', '-i',
           dest = 'input_table',
           help = "input table (.csv, .tsv, or other delimited text)")
-    parser.add_option('--output',
-          '-o',
-          action = 'store',
-          type = 'string',
+    parser.add_argument('--output', '-o',
           dest = 'output_fasta',
           help = "output fasta file")
-    parser.add_option('--delimiter',
-          '-d',
-          action = 'store',
-          type = 'string',
+    parser.add_argument('--delimiter', '-d',
           dest = 'delimiter',
-          help = "column delimiter; accepts escapes like '\\t' and the aliases 'tab'/'comma' (default: ',')",
-          default = ",")
-    parser.add_option('--name-col',
-          '-n',
-          action = 'store',
-          type = 'int',
+          default = ",",
+          help = "column delimiter; accepts escapes like '\\t' and the aliases 'tab'/'comma' (default: ',')")
+    parser.add_argument('--name-col', '-n',
           dest = 'name_col',
-          help = "1-based column number holding sequence names (default: 1)",
-          default = 1)
-    parser.add_option('--seq-col',
-          '-s',
-          action = 'store',
-          type = 'int',
+          type = int,
+          default = 1,
+          help = "1-based column number holding sequence names (default: 1)")
+    parser.add_argument('--seq-col', '-s',
           dest = 'seq_col',
-          help = "1-based column number holding sequences (default: 2)",
-          default = 2)
-    parser.add_option('--no-header',
-          action = 'store_false',
+          type = int,
+          default = 2,
+          help = "1-based column number holding sequences (default: 2)")
+    parser.add_argument('--no-header',
           dest = 'header',
-          help = "set if the table has no header row (default: assumes a header row)",
-          default = True)
+          action = 'store_false',
+          default = True,
+          help = "set if the table has no header row (default: assumes a header row)")
 
-    (option, args) = parser.parse_args()
+    option = parser.parse_args()
 
     main(option.input_table, option.output_fasta, option.delimiter,
          option.name_col, option.seq_col, option.header)

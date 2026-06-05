@@ -6,7 +6,7 @@ Created on Mon Oct 18 13:16:01 2021
 @author: bryanandrews1
 """
 
-def main(input_fasta, output_fasta, bias_file):
+def main(input_fasta, output_fasta, bias_file, banned = None):
 
     entries = dt.read_fasta_multi(input_fasta)
 
@@ -21,6 +21,9 @@ def main(input_fasta, output_fasta, bias_file):
             DNA_seq = strip_microhomology(DNA_seq)
             DNA_seq = strip_mononucleotide_tracts(DNA_seq)
             DNA_seq = strip_G_quadruplexes(DNA_seq)
+            #Banned subsequence removal runs last so that no earlier step can
+            #reintroduce a forbidden site (e.g. a restriction enzyme site)
+            DNA_seq = strip_banned_subsequences(DNA_seq, banned, seq_name)
         except Exception as e:
             sys.stderr.write("Warning: failed to optimize sequence '%s' (%s), skipping\n"
                              % (seq_name, e))
@@ -56,7 +59,77 @@ def strip_G_quadruplexes(DNA_seq):
             #re-sync DNA_seq so the next .find() reflects the edits we just made
             DNA_seq = ''.join(codon_seq)
     return ''.join(codon_seq)
-    
+
+def strip_banned_subsequences(DNA_seq, banned, seq_name = "", max_attempts = 2000):
+    #Remove arbitrary forbidden subsequences (e.g. restriction enzyme sites) by
+    #swapping in synonymous codons, so the encoded protein is unchanged. Because
+    #enzymes cut either strand, each banned motif's reverse complement is banned
+    #too. This is meant to run last in the pipeline so nothing reintroduces a site.
+    if not banned:
+        return DNA_seq
+
+    #Build the set of target sequences: each motif plus its reverse complement.
+    valid_bases = set("ACGTN")
+    targets = []
+    seen = set()
+    for motif in banned:
+        for t in (motif.upper(), _safe_revcomp(motif.upper(), valid_bases)):
+            if t and t not in seen:
+                seen.add(t)
+                targets.append(t)
+
+    codon_seq = [DNA_seq[i:i+3] for i in range(0, len(DNA_seq), 3)]
+    blocked = set()  #(target, position) pairs we know can't be broken
+    attempt_count = 0
+    while True:
+        seq_now = ''.join(codon_seq)
+        #Find the earliest occurrence of any target that we haven't given up on.
+        hit = None
+        for t in targets:
+            start = 0
+            while True:
+                pos = seq_now.find(t, start)
+                if pos == -1:
+                    break
+                if (t, pos) not in blocked:
+                    if hit is None or pos < hit[0]:
+                        hit = (pos, t)
+                    break
+                start = pos + 1
+        if hit is None:
+            break
+        attempt_count += 1
+        if attempt_count > max_attempts:
+            break
+        pos, t = hit
+        #Codons spanning the banned site; only those with synonyms are mutable.
+        first_codon = pos // 3
+        last_codon = (pos + len(t) - 1) // 3
+        candidates = [c for c in range(first_codon, last_codon + 1)
+                      if len(dt.codon_synonyms[codon_seq[c]]) > 0]
+        if not candidates:
+            #No covering codon can change without altering the protein -> give up
+            #on this particular occurrence and move on to any others.
+            blocked.add((t, pos))
+            continue
+        c = random.choice(candidates)
+        codon_seq[c] = random.choice(dt.codon_synonyms[codon_seq[c]])
+
+    final_seq = ''.join(codon_seq)
+    remaining = sorted({t for t in targets if t in final_seq})
+    if remaining:
+        label = (" in '%s'" % seq_name) if seq_name else ""
+        sys.stderr.write("Warning: unable to remove banned subsequence(s)%s: %s "
+                         "(returning best effort)\n" % (label, ", ".join(remaining)))
+    return final_seq
+
+def _safe_revcomp(motif, valid_bases):
+    #Only reverse-complement motifs made of recognized bases; dt.reverse_complement
+    #would otherwise sys.exit() on an unexpected character.
+    if set(motif) <= valid_bases:
+        return dt.reverse_complement(motif)
+    return None
+
 def strip_mononucleotide_tracts(DNA_seq):
     #Find any occurrence of 5+ of the same base in a row and break it
     codon_seq = [DNA_seq[i:i+3] for i in range(0, len(DNA_seq), 3)]
@@ -225,32 +298,31 @@ def fix_GC(DNA_seq, lim_high = 0.6, lim_low = 0.45):
 
 if __name__ == "__main__":
 
-    from optparse import OptionParser
+    import argparse
     import DNA_tools as dt
     import random
     import sys
 
-    parser = OptionParser()
-    parser.add_option('--input',
-          '-i',
-          action = 'store',
-          type = 'string',
+    parser = argparse.ArgumentParser(
+        description = "Optimize DNA sequence(s) for synthesis/assembly")
+    parser.add_argument('--input', '-i',
           dest = 'input_fasta',
           help = "input fasta with your DNA sequence to be optimized")
-    parser.add_option('--output',
-          '-o',
-          action = 'store',
-          type = 'string',
+    parser.add_argument('--output', '-o',
           dest = 'output_fasta',
           help = "output fasta with your optimized DNA sequence")
-    parser.add_option('--bias',
-          '-b',
-          action = 'store',
-          type = 'string',
+    parser.add_argument('--bias', '-b',
           dest = 'bias_file',
-          help = "codon bias file",
-          default = "../ColiProteomeContent.tsv")
+          default = "../codon_sets/ColiProteomeContent.tsv",
+          help = "codon bias file")
+    parser.add_argument('--ban',
+          dest = 'banned',
+          nargs = '*',
+          default = [],
+          metavar = 'SUBSEQ',
+          help = "one or more subsequences to remove (e.g. restriction sites); "
+                 "the reverse complement of each is removed as well")
 
-    (option, args) = parser.parse_args()
+    option = parser.parse_args()
 
-    main(option.input_fasta, option.output_fasta, option.bias_file)
+    main(option.input_fasta, option.output_fasta, option.bias_file, option.banned)
